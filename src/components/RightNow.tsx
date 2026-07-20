@@ -25,7 +25,7 @@ export function RightNow(p: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.hero}>
-        <WeatherIcon name={p.icon} size={86} />
+        <WeatherIcon name={p.icon} size={96} />
         <Text style={styles.temp}>{Math.round(p.temp)}°C</Text>
       </View>
 
@@ -61,7 +61,7 @@ const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     wrap: {},
     hero: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-    temp: { fontFamily: fonts.serifBlack, fontSize: 58, color: colors.ink, lineHeight: 62 },
+    temp: { fontFamily: fonts.serifBlack, fontSize: 58, color: colors.ink, lineHeight: 62, paddingRight: 14 },
     summary: {
       textAlign: 'center',
       fontFamily: fonts.bodyBold,

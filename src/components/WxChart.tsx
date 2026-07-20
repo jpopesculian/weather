@@ -3,7 +3,7 @@
 // (speed + gust + direction arrows), all with a draggable scrubber + readout.
 import { useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Line, Path, Rect, Circle, G, Text as SvgText, TSpan } from 'react-native-svg';
+import Svg, { Line, Path, Rect, Circle, G, Text as SvgText } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { fonts, useTheme, type Colors } from '../theme';
@@ -164,10 +164,8 @@ export function WxChart({ type, window: win, accent: accentProp, hidden = {} }: 
 
   let sx = PL;
   let sy = PB;
-  let readout = ''; // line-1 text for temp/precip (and wind fallback)
-  let mainVal: number | null = null; // wind: speed (drives the "x/y km/h" line)
-  let subVal: number | null = null; // wind: gust (shown only when the gust series is on)
-  let line2Suffix = ''; // precip: appends " · N%" (chance) to the time line
+  let readout = ''; // line-1 value text (all chart types)
+  let line2Suffix = ''; // appended to the time line — precip: " · N%", wind: " · Gusts N"
   let primaryVisible = true; // is the scrubbed (primary) series shown?
   let leftBottom = 0; // left-axis value at the bottom gridline
   let leftTop = 1; // left-axis value at the top gridline
@@ -299,8 +297,7 @@ export function WxChart({ type, window: win, accent: accentProp, hidden = {} }: 
     sx = PL + curFrac * PW;
     sy = yW(sv);
     readout = `${Math.round(sv)} km/h`;
-    mainVal = Math.round(sv);
-    subVal = gustVisible ? Math.round(sg) : null;
+    line2Suffix = gustVisible ? ` · Gusts ${Math.round(sg)}` : '';
   }
 
   // y-axis tick values at the bottom / middle / top gridlines.
@@ -355,11 +352,11 @@ export function WxChart({ type, window: win, accent: accentProp, hidden = {} }: 
   els.push(<Line key="scl" x1={sx} y1={PT - 8} x2={sx} y2={PB} stroke={accent} strokeWidth={1.5} />);
 
   // Floating tag readout (design 1b/1c): a filled callout that rides the dot,
-  // flipping above/below to stay on-screen. Value + time in one tight unit
-  // (wind folds gust into "speed/gust km/h").
+  // flipping above/below to stay on-screen. Line 1 is the value; line 2 is the
+  // time plus an optional suffix (precip chance, or wind gust).
   if (primaryVisible) {
     const timeStr = fracToClock(curFrac, win.startHour);
-    const l1len = subVal != null ? String(mainVal).length + String(subVal).length + 6 : readout.length;
+    const l1len = readout.length;
     const l2len = (timeStr + line2Suffix).length;
     const tw = Math.max(50, Math.max(l1len * 8.2, l2len * 5.0) + 14);
     const th = 30;
@@ -382,17 +379,9 @@ export function WxChart({ type, window: win, accent: accentProp, hidden = {} }: 
         <Rect x={sx - cw} y={above ? ty + th / 2 : ty} width={CARET_W} height={th / 2} fill={accent} />
         <Path d={caret} fill={accent} />
         <Rect x={tx} y={ty} width={tw} height={th} rx={9} fill={accent} />
-        {subVal != null ? (
-          <SvgText x={tx + tw / 2} y={ty + 14} textAnchor="middle">
-            <TSpan fontSize={14} fontFamily={fonts.bodyExtra} fill="#fff">{String(mainVal)}</TSpan>
-            <TSpan fontSize={10} fontFamily={fonts.bodyBold} fill="rgba(255,255,255,0.6)">{`/${subVal}`}</TSpan>
-            <TSpan fontSize={14} fontFamily={fonts.bodyExtra} fill="#fff">{' km/h'}</TSpan>
-          </SvgText>
-        ) : (
-          <SvgText x={tx + tw / 2} y={ty + 14} textAnchor="middle" fontSize={14} fontFamily={fonts.bodyExtra} fill="#fff">
-            {readout}
-          </SvgText>
-        )}
+        <SvgText x={tx + tw / 2} y={ty + 14} textAnchor="middle" fontSize={14} fontFamily={fonts.bodyExtra} fill="#fff">
+          {readout}
+        </SvgText>
         <SvgText x={tx + tw / 2} y={ty + 24} textAnchor="middle" fontSize={8.5} fontFamily={fonts.bodySemi} fill="rgba(255,255,255,0.85)">
           {`${timeStr}${line2Suffix}`}
         </SvgText>
