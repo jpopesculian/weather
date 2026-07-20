@@ -5,12 +5,13 @@ import { SearchGlyph, PinGlyph, SunGlyph, MoonGlyph, SystemGlyph } from './icons
 
 type Props = {
   placeName: string;
+  isCurrent: boolean;
   onSearchPress: () => void;
 };
 
 const THEME_ICON = { light: SunGlyph, dark: MoonGlyph, system: SystemGlyph };
 
-export function Header({ placeName, onSearchPress }: Props) {
+export function Header({ placeName, isCurrent, onSearchPress }: Props) {
   const { colors, mode, cycleMode } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const ThemeIcon = THEME_ICON[mode];
@@ -28,7 +29,7 @@ export function Header({ placeName, onSearchPress }: Props) {
       </Pressable>
 
       <View style={styles.place}>
-        <PinGlyph size={13} color={colors.coral} />
+        {isCurrent && <PinGlyph size={13} color={colors.coral} />}
         <Text style={styles.placeText} numberOfLines={1}>
           {placeName}
         </Text>

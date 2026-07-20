@@ -11,6 +11,7 @@ export type Place = {
   countryCode?: string;
   latitude: number;
   longitude: number;
+  current?: boolean; // true when derived from device GPS (shows the location pin)
 };
 
 export type CurrentWx = {

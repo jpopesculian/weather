@@ -1,16 +1,17 @@
-// Device GPS → a Place. Coordinates come from expo-location; the place *name*
-// comes from a reverse geocode. We use BigDataCloud's keyless client endpoint
-// (reliable city/locality, works on web + native), falling back to the on-device
-// geocoder, then to a generic label.
+// Device GPS. `getCurrentPosition` returns coordinates (fast — this is what a
+// "Locating…" indicator should wait on). `resolvePlaceName` reverse-geocodes
+// those coordinates to a human-readable name; it's a separate network step so the
+// caller can run it in the background rather than blocking on it. Names come from
+// BigDataCloud's keyless client endpoint (reliable city/locality, web + native),
+// falling back to the on-device geocoder.
 import * as Location from 'expo-location';
-import type { Place } from './openMeteo';
 
-export type LocationResult =
-  | { status: 'ok'; place: Place }
+export type PositionResult =
+  | { status: 'ok'; latitude: number; longitude: number }
   | { status: 'denied' }
   | { status: 'error' };
 
-type PlaceName = { name: string; admin1?: string; country?: string };
+export type PlaceName = { name: string; admin1?: string; country?: string };
 
 // Keyless reverse geocoding (no API key, CORS-enabled — works on web + native).
 async function reverseGeocodeHttp(latitude: number, longitude: number): Promise<PlaceName | null> {
@@ -45,7 +46,9 @@ async function reverseGeocodeDevice(latitude: number, longitude: number): Promis
   }
 }
 
-export async function getCurrentPlace(): Promise<LocationResult> {
+// Permission + a GPS fix. No reverse geocoding, so it returns as soon as the
+// device has coordinates.
+export async function getCurrentPosition(): Promise<PositionResult> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return { status: 'denied' };
@@ -53,23 +56,17 @@ export async function getCurrentPlace(): Promise<LocationResult> {
     const pos = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
-    const { latitude, longitude } = pos.coords;
-
-    const named =
-      (await reverseGeocodeHttp(latitude, longitude)) ??
-      (await reverseGeocodeDevice(latitude, longitude));
-
-    return {
-      status: 'ok',
-      place: {
-        name: named?.name ?? 'Current Location',
-        admin1: named?.admin1,
-        country: named?.country,
-        latitude,
-        longitude,
-      },
-    };
+    return { status: 'ok', latitude: pos.coords.latitude, longitude: pos.coords.longitude };
   } catch {
     return { status: 'error' };
   }
+}
+
+// Reverse geocode coordinates → a place name (HTTP first, on-device fallback).
+// Returns null if neither resolves a name.
+export async function resolvePlaceName(latitude: number, longitude: number): Promise<PlaceName | null> {
+  return (
+    (await reverseGeocodeHttp(latitude, longitude)) ??
+    (await reverseGeocodeDevice(latitude, longitude))
+  );
 }

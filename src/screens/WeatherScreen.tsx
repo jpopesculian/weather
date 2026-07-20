@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { fonts, space, useTheme, type Colors } from '../theme';
 import { type Place } from '../lib/openMeteo';
 import { describeWeather } from '../lib/wmo';
 import { hourIndex, todayWindow } from '../lib/derive';
-import { getCurrentPlace } from '../lib/location';
+import { getCurrentPosition, resolvePlaceName, type PositionResult } from '../lib/location';
 import { loadLastLocation, saveLastLocation } from '../lib/storage';
 import { useForecast } from '../hooks/useForecast';
 import { Header } from '../components/Header';
@@ -62,6 +62,37 @@ export function WeatherScreen() {
     return () => clearInterval(id);
   }, []);
 
+  // Track the latest place so background name-resolution can bail out if the user
+  // switched locations while it was in flight.
+  const placeRef = useRef<Place | null>(null);
+  useEffect(() => {
+    placeRef.current = place;
+  }, [place]);
+
+  // Reverse-geocode in the background and patch the name in. Same coords ⇒ no
+  // forecast re-fetch (useForecast keys on lat/lon). Persists the named place.
+  const fillInName = useCallback((latitude: number, longitude: number) => {
+    resolvePlaceName(latitude, longitude).then((named) => {
+      if (!named) return;
+      const cur = placeRef.current;
+      if (!cur || cur.latitude !== latitude || cur.longitude !== longitude) return;
+      const full: Place = { ...cur, ...named };
+      setPlace(full);
+      saveLastLocation(full);
+    });
+  }, []);
+
+  // GPS → show the location from coordinates immediately (the forecast only needs
+  // lat/lon), then resolve its name in the background so "Locating" isn't blocked
+  // on the reverse-geocode round-trip.
+  const locateAndSet = useCallback(async (): Promise<PositionResult['status']> => {
+    const pos = await getCurrentPosition();
+    if (pos.status !== 'ok') return pos.status;
+    setPlace({ name: 'Current Location', latitude: pos.latitude, longitude: pos.longitude, current: true });
+    fillInName(pos.latitude, pos.longitude);
+    return 'ok';
+  }, [fillInName]);
+
   // On launch: restore last location → GPS → sensible default.
   useEffect(() => {
     let cancelled = false;
@@ -71,19 +102,13 @@ export function WeatherScreen() {
         if (!cancelled) setPlace(saved);
         return;
       }
-      const loc = await getCurrentPlace();
-      if (cancelled) return;
-      if (loc.status === 'ok') {
-        setPlace(loc.place);
-        saveLastLocation(loc.place);
-      } else {
-        setPlace(DEFAULT_PLACE);
-      }
+      const status = await locateAndSet();
+      if (!cancelled && status !== 'ok') setPlace(DEFAULT_PLACE);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [locateAndSet]);
 
   const selectPlace = useCallback((p: Place) => {
     setPlace(p);
@@ -93,21 +118,19 @@ export function WeatherScreen() {
 
   const useCurrentLocation = useCallback(async () => {
     setLocating(true);
-    const loc = await getCurrentPlace();
+    const status = await locateAndSet();
     setLocating(false);
-    if (loc.status === 'ok') {
-      setPlace(loc.place);
-      saveLastLocation(loc.place);
+    if (status === 'ok') {
       setSearchVisible(false);
     } else {
       Alert.alert(
         'Location unavailable',
-        loc.status === 'denied'
+        status === 'denied'
           ? 'Location permission was denied. Search for a city instead.'
           : "Couldn't get your location. Search for a city instead."
       );
     }
-  }, []);
+  }, [locateAndSet]);
 
   const initializing = !place;
 
@@ -124,7 +147,7 @@ export function WeatherScreen() {
         }
       >
         <View style={styles.inner}>
-        <Header placeName={place?.name ?? 'Locating…'} onSearchPress={() => setSearchVisible(true)} />
+        <Header placeName={place?.name ?? 'Locating…'} isCurrent={!!place?.current} onSearchPress={() => setSearchVisible(true)} />
 
         {(initializing || (loading && !forecast)) && !error && (
           <View style={styles.center}>
