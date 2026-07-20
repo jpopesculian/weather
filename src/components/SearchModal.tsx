@@ -159,7 +159,7 @@ export function SearchModal({
                       {[p.admin1, p.country].filter(Boolean).join(' · ')}
                     </Text>
                   </View>
-                  <Text style={styles.resultTemp}>{brief ? `${Math.round(brief.temp)}°` : ''}</Text>
+                  <Text style={styles.resultTemp}>{brief ? `${Math.round(brief.temp)}°C` : ''}</Text>
                 </Pressable>
               );
             })}

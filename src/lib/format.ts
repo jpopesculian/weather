@@ -12,12 +12,6 @@ export function degToCompass(deg: number): string {
   return COMPASS[(idx + 8) % 8];
 }
 
-// Precip amount: Open-Meteo returns mm; the wireframe shows cm.
-export function mmToCmLabel(mm: number): string {
-  const cm = mm / 10;
-  return `${cm.toFixed(1)}cm`;
-}
-
 // "YYYY-MM-DD" (or ISO) → short weekday, with "Today" for the current date.
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 

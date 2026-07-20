@@ -29,5 +29,25 @@ export function useForecast(place: Place | null) {
     };
   }, [place?.latitude, place?.longitude, nonce]);
 
+  // Auto-refetch every 15 minutes while mounted — silent (updates the data in
+  // place without toggling the loading/refresh spinner).
+  useEffect(() => {
+    if (!place) return;
+    let cancelled = false;
+    const id = setInterval(() => {
+      fetchForecast(place.latitude, place.longitude)
+        .then((f) => {
+          if (!cancelled) setState((s) => ({ ...s, forecast: f, error: null }));
+        })
+        .catch(() => {
+          // keep showing the last-good data on a failed background refresh
+        });
+    }, 15 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [place?.latitude, place?.longitude]);
+
   return { ...state, refresh };
 }

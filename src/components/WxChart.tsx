@@ -230,16 +230,11 @@ export function WxChart({ type, window: win, accent: accentProp, hidden = {} }: 
     if (humidityVisible) els.push(<Path key="humidity" d={smooth(hpts)} fill="none" stroke={colors.blue} strokeWidth={1.6} strokeDasharray={OVERLAY_DASH} strokeLinecap="round" />);
     if (tempVisible) els.push(<Path key="line" d={smooth(pts)} fill="none" stroke={colors.ink} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />);
 
-    // now dot
-    if (win.nowFrac != null) {
-      els.push(<Circle key="nowdot" cx={PL + win.nowFrac * PW} cy={PB} r={2.6} fill={accent} />);
-    }
-
     pushConditionIcons();
     const sv = interp(temps, curFrac);
     sx = PL + curFrac * PW;
     sy = yT(sv);
-    readout = `${Math.round(sv)}°`;
+    readout = `${Math.round(sv)}°C`;
   } else if (type === 'Precip') {
     const mm = win.precip; // rainfall amount (mm) → histogram bars
     const prob = win.precipProb; // chance of rain (%) → line, fixed 0–100
@@ -336,6 +331,24 @@ export function WxChart({ type, window: win, accent: accentProp, hidden = {} }: 
         </SvgText>
       );
     });
+  }
+
+  // "Now" pill on the bottom axis showing the current time (no drop line). Pushed
+  // before the scrubber + readout so it sits behind them if they ever overlap.
+  if (win.nowFrac != null) {
+    const nowNx = PL + win.nowFrac * PW;
+    const nowTime = fracToClock(win.nowFrac, win.startHour);
+    const pw = Math.round(nowTime.length * 5.2 + 14);
+    const px = Math.max(PL, Math.min(PR - pw, nowNx - pw / 2));
+    const py = PB + 3;
+    els.push(
+      <G key="now">
+        <Rect x={px} y={py} width={pw} height={15} rx={7.5} fill={colors.ink} />
+        <SvgText x={px + pw / 2} y={py + 10.5} textAnchor="middle" fontSize={8.5} fontFamily={fonts.bodyExtra} fill={colors.cream}>
+          {nowTime}
+        </SvgText>
+      </G>
+    );
   }
 
   // Thin scrubber position line (kept thin, full height).

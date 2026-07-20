@@ -26,7 +26,7 @@ const makeStyles = (colors: Colors) =>
       borderColor: colors.ink,
       borderRadius: 12,
       paddingVertical: 7,
-      paddingHorizontal: 10,
+      paddingHorizontal: 7,
       gap: 2,
     },
     label: {
@@ -38,6 +38,6 @@ const makeStyles = (colors: Colors) =>
     value: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
+      gap: 3,
     },
   });

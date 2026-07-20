@@ -53,6 +53,7 @@ export type DailyWx = {
 
 export type Forecast = {
   timezone: string;
+  utcOffsetSeconds: number; // location's UTC offset (for an accurate "now")
   current: CurrentWx;
   hourly: HourlyWx;
   daily: DailyWx;
@@ -110,6 +111,7 @@ export async function fetchForecast(lat: number, lon: number): Promise<Forecast>
 
   return {
     timezone: j.timezone,
+    utcOffsetSeconds: j.utc_offset_seconds ?? 0,
     current: {
       time: j.current.time,
       temp: j.current.temperature_2m,

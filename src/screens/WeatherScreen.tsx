@@ -54,6 +54,14 @@ export function WeatherScreen() {
   const [locating, setLocating] = useState(false);
   const { forecast, loading, error, refresh } = useForecast(place);
 
+  // Tick every 10s so the "now" marker/time stays current (the chart windows are
+  // recomputed from the device clock on each render).
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setClockTick((t) => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
+
   // On launch: restore last location → GPS → sensible default.
   useEffect(() => {
     let cancelled = false;

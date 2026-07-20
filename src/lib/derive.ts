@@ -85,16 +85,28 @@ function build(forecast: Forecast, startIdx: number, dayIdx: number, nowIso?: st
   };
 }
 
-// "Today": the next 24h starting at the current hour.
+// The current wall-clock time at the forecast location, as a "YYYY-MM-DDTHH:MM"
+// string (same unqualified-local form as the hourly times). Derived from the
+// device clock + the location's UTC offset, so it's minute-accurate — unlike
+// Open-Meteo's current.time, which is aligned to 15-minute marks.
+function locationNowIso(forecast: Forecast): string {
+  const shifted = new Date(Date.now() + forecast.utcOffsetSeconds * 1000);
+  return shifted.toISOString().slice(0, 16);
+}
+
+// "Today": a 24h window padded to start one hour before the current hour (so
+// there's a little context to the left of "now"), clamped to the forecast start.
 export function todayWindow(forecast: Forecast): ChartWindow {
-  const start = hourIndex(forecast.hourly, forecast.current.time);
-  return build(forecast, start, 0, forecast.current.time);
+  const nowIso = locationNowIso(forecast);
+  const start = Math.max(0, hourIndex(forecast.hourly, nowIso) - 1);
+  return build(forecast, start, 0, nowIso);
 }
 
 // A specific forecast day (index into daily.*): that calendar day, 00:00–24:00.
 export function dayWindow(forecast: Forecast, dayIdx: number): ChartWindow {
   const dayIso = forecast.daily.time[dayIdx];
   const start = hourIndex(forecast.hourly, `${dayIso}T00:00`);
-  const isToday = dayIso.slice(0, 10) === forecast.current.time.slice(0, 10);
-  return build(forecast, start, dayIdx, isToday ? forecast.current.time : undefined);
+  const nowIso = locationNowIso(forecast);
+  const isToday = dayIso.slice(0, 10) === nowIso.slice(0, 10);
+  return build(forecast, start, dayIdx, isToday ? nowIso : undefined);
 }
