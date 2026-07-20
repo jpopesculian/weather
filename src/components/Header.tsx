@@ -1,13 +1,20 @@
+import { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { colors, fonts } from '../theme';
-import { SearchGlyph, GearGlyph, PinGlyph } from './icons';
+import { fonts, useTheme, type Colors } from '../theme';
+import { SearchGlyph, PinGlyph, SunGlyph, MoonGlyph, SystemGlyph } from './icons';
 
 type Props = {
   placeName: string;
   onSearchPress: () => void;
 };
 
+const THEME_ICON = { light: SunGlyph, dark: MoonGlyph, system: SystemGlyph };
+
 export function Header({ placeName, onSearchPress }: Props) {
+  const { colors, mode, cycleMode } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const ThemeIcon = THEME_ICON[mode];
+
   return (
     <View style={styles.row}>
       <Pressable
@@ -27,42 +34,48 @@ export function Header({ placeName, onSearchPress }: Props) {
         </Text>
       </View>
 
-      {/* Settings gear — decorative in the metric-only build */}
-      <View style={styles.circle}>
-        <GearGlyph size={16} color={colors.coral} />
-      </View>
+      <Pressable
+        onPress={cycleMode}
+        style={styles.circle}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={`Theme: ${mode}. Tap to switch light, dark, or system.`}
+      >
+        <ThemeIcon size={16} color={colors.coral} />
+      </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  circle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  place: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-  },
-  placeText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: 16,
-    color: colors.coral,
-    flexShrink: 1,
-  },
-});
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 4,
+    },
+    circle: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    place: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 8,
+    },
+    placeText: {
+      fontFamily: fonts.bodyBold,
+      fontSize: 16,
+      color: colors.coral,
+      flexShrink: 1,
+    },
+  });

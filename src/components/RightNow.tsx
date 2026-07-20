@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, fonts } from '../theme';
+import { fonts, useTheme, type Colors } from '../theme';
 import { WeatherIcon, type IconName } from './WeatherIcon';
 import { StatCard } from './StatCard';
 import { DropGlyph, WindArrow } from './icons';
@@ -19,6 +20,8 @@ type Props = {
 };
 
 export function RightNow(p: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>Right Now</Text>
@@ -53,13 +56,14 @@ export function RightNow(p: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: 12 },
-  title: { fontFamily: fonts.serif, fontSize: 27, color: colors.ink },
-  main: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  temp: { fontFamily: fonts.serifBlack, fontSize: 46, color: colors.ink, lineHeight: 50 },
-  detail: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink, lineHeight: 19, flexShrink: 1 },
-  detailDim: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, lineHeight: 18 },
-  stats: { flexDirection: 'row', gap: 8, marginTop: 2 },
-  statText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
-});
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+    wrap: { gap: 12 },
+    title: { fontFamily: fonts.serif, fontSize: 27, color: colors.ink },
+    main: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    temp: { fontFamily: fonts.serifBlack, fontSize: 46, color: colors.ink, lineHeight: 50 },
+    detail: { fontFamily: fonts.bodySemi, fontSize: 14, color: colors.ink, lineHeight: 19, flexShrink: 1 },
+    detailDim: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, lineHeight: 18 },
+    stats: { flexDirection: 'row', gap: 8, marginTop: 2 },
+    statText: { fontFamily: fonts.bodyBold, fontSize: 14, color: colors.ink },
+  });

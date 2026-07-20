@@ -68,3 +68,46 @@ export function WindArrow({
     </Svg>
   );
 }
+
+// Theme-mode glyphs for the header switch.
+export function SunGlyph({ size = 16, color = colors.coral }: StrokeProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size}>
+      <Circle cx={12} cy={12} r={4.6} fill="none" stroke={color} strokeWidth={2} />
+      <G stroke={color} strokeWidth={2} strokeLinecap="round">
+        <Line x1={12} y1={2} x2={12} y2={4.5} />
+        <Line x1={12} y1={19.5} x2={12} y2={22} />
+        <Line x1={2} y1={12} x2={4.5} y2={12} />
+        <Line x1={19.5} y1={12} x2={22} y2={12} />
+        <Line x1={4.9} y1={4.9} x2={6.7} y2={6.7} />
+        <Line x1={17.3} y1={17.3} x2={19.1} y2={19.1} />
+        <Line x1={19.1} y1={4.9} x2={17.3} y2={6.7} />
+        <Line x1={6.7} y1={17.3} x2={4.9} y2={19.1} />
+      </G>
+    </Svg>
+  );
+}
+
+export function MoonGlyph({ size = 16, color = colors.coral }: StrokeProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size}>
+      <Path
+        d="M21 12.8A8.2 8.2 0 1 1 11.2 3 6.4 6.4 0 0 0 21 12.8Z"
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// System / auto: a circle with one half filled (contrast).
+export function SystemGlyph({ size = 16, color = colors.coral }: StrokeProps) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size}>
+      <Circle cx={12} cy={12} r={8} fill="none" stroke={color} strokeWidth={2} />
+      <Path d="M12 4.5 A7.5 7.5 0 0 1 12 19.5 Z" fill={color} />
+    </Svg>
+  );
+}

@@ -1,6 +1,9 @@
-// Palette extracted from the Claude Design wireframes.
-// Warm cream base, coral accent, ink text — minimal & friendly.
-export const colors = {
+// Palette extracted from the Claude Design wireframes, with a warm dark
+// counterpart. Same keys in both so components can switch at runtime via the
+// theme context. Light = warm cream; dark = warm espresso (not pure black),
+// keeping the friendly feel. Coral accent carries across both.
+
+export const colorsLight = {
   // Surfaces
   cream: '#f0eee9', // app background
   card: '#fffdf8', // raised cards / sheets
@@ -31,9 +34,51 @@ export const colors = {
   grid: '#eae3d4', // chart gridlines
   handle: '#d8d2c6', // sheet drag handle
 
-  // Shadow (signature offset drop shadow)
+  // Chrome
+  scrubDot: '#ffffff', // scrubber dot fill / on-coral text
   shadow: 'rgba(42,42,42,0.10)',
   backdrop: 'rgba(28,26,22,0.32)',
 } as const;
 
-export type ColorName = keyof typeof colors;
+export type Colors = { [K in keyof typeof colorsLight]: string };
+
+export const colorsDark: Colors = {
+  // Surfaces
+  cream: '#1b1813',
+  card: '#241f19',
+  segment: '#2c261f',
+  wash: '#2a241d',
+
+  // Text
+  ink: '#f2ede3',
+  muted: '#b6ac9d',
+  soft: '#978d7e',
+  faint: '#7a7164',
+
+  // Accent
+  coral: '#e87d5e',
+  coralDark: '#cf6a4f',
+
+  // Weather hues
+  gold: '#eec25c',
+  blue: '#8fb9ce',
+  precip: '#33454f',
+  precipActive: '#7fb2d2',
+  cloud: '#4a4f56',
+  cloudLine: '#6f6759',
+  gust: '#7c7568',
+
+  // Lines
+  hairline: '#332d25',
+  grid: '#2c271f',
+  handle: '#48423a',
+
+  // Chrome
+  scrubDot: '#241f19',
+  shadow: 'rgba(0,0,0,0.4)',
+  backdrop: 'rgba(0,0,0,0.55)',
+};
+
+// Legacy static alias (light). Prefer useTheme().colors in components.
+export const colors: Colors = colorsLight;
+export type ColorName = keyof typeof colorsLight;

@@ -13,6 +13,10 @@ background, coral accents, bold serif headings — built from the Claude Design
   an inline chart with its own Temp / Precip / Wind tabs.
 - **Search** — city search with per-result conditions and temperatures, plus a
   "Current Location" option (device GPS). The last location is remembered.
+- **Theme** — the top-right button cycles Light → Dark → System (warm cream vs.
+  warm espresso); the choice is remembered and the icon reflects the current mode.
+- **Responsive** — two-column layout on wide screens (weather + today | 10-day),
+  single column on phones.
 
 ## Stack
 

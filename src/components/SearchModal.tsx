@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, fonts } from '../theme';
+import { fonts, useTheme, type Colors } from '../theme';
 import {
   searchPlaces,
   fetchCurrentBrief,
@@ -40,6 +40,8 @@ export function SearchModal({
   locating,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [briefs, setBriefs] = useState<Record<string, CurrentBrief>>({});
@@ -74,7 +76,6 @@ export function SearchModal({
         if (controller.signal.aborted) return;
         setResults(places);
         setLoading(false);
-        // Fetch current conditions for each result (best-effort).
         places.forEach(async (p) => {
           const brief = await fetchCurrentBrief(p.latitude, p.longitude, controller.signal);
           if (brief && !controller.signal.aborted) {
@@ -133,9 +134,7 @@ export function SearchModal({
             {locating && <ActivityIndicator color={colors.coral} />}
           </Pressable>
 
-          {query.trim().length >= 2 && (
-            <Text style={styles.sectionLabel}>MATCHING CITIES</Text>
-          )}
+          {query.trim().length >= 2 && <Text style={styles.sectionLabel}>MATCHING CITIES</Text>}
 
           <ScrollView
             keyboardShouldPersistTaps="handled"
@@ -155,14 +154,12 @@ export function SearchModal({
                     {cond ? <WeatherIcon name={cond.icon} size={30} /> : null}
                   </View>
                   <View style={styles.resultText}>
-                    <HighlightedName name={p.name} query={query} />
+                    <HighlightedName name={p.name} query={query} colors={colors} />
                     <Text style={styles.resultSub} numberOfLines={1}>
                       {[p.admin1, p.country].filter(Boolean).join(' · ')}
                     </Text>
                   </View>
-                  <Text style={styles.resultTemp}>
-                    {brief ? `${Math.round(brief.temp)}°` : ''}
-                  </Text>
+                  <Text style={styles.resultTemp}>{brief ? `${Math.round(brief.temp)}°` : ''}</Text>
                 </Pressable>
               );
             })}
@@ -173,80 +170,80 @@ export function SearchModal({
   );
 }
 
-function HighlightedName({ name, query }: { name: string; query: string }) {
+function HighlightedName({ name, query, colors }: { name: string; query: string; colors: Colors }) {
+  const base = { fontFamily: fonts.bodyExtra, fontSize: 22, color: colors.ink } as const;
   const q = query.trim();
   const idx = q ? name.toLowerCase().indexOf(q.toLowerCase()) : -1;
   if (idx < 0) {
-    return <Text style={styles.resultName}>{name}</Text>;
+    return <Text style={base}>{name}</Text>;
   }
   return (
-    <Text style={styles.resultName}>
+    <Text style={base}>
       {name.slice(0, idx)}
-      <Text style={styles.match}>{name.slice(idx, idx + q.length)}</Text>
+      <Text style={{ color: colors.coral }}>{name.slice(idx, idx + q.length)}</Text>
       {name.slice(idx + q.length)}
     </Text>
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: colors.backdrop },
-  sheet: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 26,
-    borderTopRightRadius: 26,
-    borderTopWidth: 2.5,
-    borderColor: colors.ink,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  handle: { width: 42, height: 5, borderRadius: 3, backgroundColor: colors.handle, alignSelf: 'center', marginBottom: 16 },
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: colors.backdrop },
+    sheet: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 26,
+      borderTopRightRadius: 26,
+      borderTopWidth: 2.5,
+      borderColor: colors.ink,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+    },
+    handle: { width: 42, height: 5, borderRadius: 3, backgroundColor: colors.handle, alignSelf: 'center', marginBottom: 16 },
 
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 6 },
-  field: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    borderWidth: 2,
-    borderColor: colors.ink,
-    borderRadius: 16,
-    paddingVertical: 9,
-    paddingHorizontal: 13,
-    backgroundColor: colors.card,
-  },
-  input: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 17, color: colors.ink, padding: 0 },
-  clear: { fontSize: 13, color: colors.soft, paddingHorizontal: 2 },
-  cancel: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.coral },
+    searchRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 6 },
+    field: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+      borderWidth: 2,
+      borderColor: colors.ink,
+      borderRadius: 16,
+      paddingVertical: 9,
+      paddingHorizontal: 13,
+      backgroundColor: colors.card,
+    },
+    input: { flex: 1, fontFamily: fonts.bodyMedium, fontSize: 17, color: colors.ink, padding: 0 },
+    clear: { fontSize: 13, color: colors.soft, paddingHorizontal: 2 },
+    cancel: { fontFamily: fonts.bodyBold, fontSize: 16, color: colors.coral },
 
-  currentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1.5,
-    borderBottomColor: colors.hairline,
-  },
-  currentText: { flex: 1 },
-  currentTitle: { fontFamily: fonts.bodyBold, fontSize: 20, color: colors.coral },
-  currentSub: { fontFamily: fonts.body, fontSize: 13, color: colors.soft },
+    currentRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      borderBottomWidth: 1.5,
+      borderBottomColor: colors.hairline,
+    },
+    currentText: { flex: 1 },
+    currentTitle: { fontFamily: fonts.bodyBold, fontSize: 20, color: colors.coral },
+    currentSub: { fontFamily: fonts.body, fontSize: 13, color: colors.soft },
 
-  sectionLabel: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 0.5, color: colors.faint, marginTop: 16, marginBottom: 4 },
+    sectionLabel: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 0.5, color: colors.faint, marginTop: 16, marginBottom: 4 },
 
-  loadingBox: { paddingVertical: 30, alignItems: 'center' },
+    loadingBox: { paddingVertical: 30, alignItems: 'center' },
 
-  resultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 13,
-    paddingVertical: 11,
-    borderBottomWidth: 1.5,
-    borderBottomColor: colors.hairline,
-  },
-  resultIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  resultText: { flex: 1 },
-  resultName: { fontFamily: fonts.bodyExtra, fontSize: 22, color: colors.ink },
-  match: { color: colors.coral },
-  resultSub: { fontFamily: fonts.body, fontSize: 13, color: colors.soft },
-  resultTemp: { fontFamily: fonts.body, fontSize: 18, color: colors.muted },
-});
+    resultRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 13,
+      paddingVertical: 11,
+      borderBottomWidth: 1.5,
+      borderBottomColor: colors.hairline,
+    },
+    resultIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+    resultText: { flex: 1 },
+    resultSub: { fontFamily: fonts.body, fontSize: 13, color: colors.soft },
+    resultTemp: { fontFamily: fonts.body, fontSize: 18, color: colors.muted },
+  });

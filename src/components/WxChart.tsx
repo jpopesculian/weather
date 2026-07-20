@@ -6,7 +6,7 @@ import { View, StyleSheet } from 'react-native';
 import Svg, { Line, Path, Rect, Circle, G, Text as SvgText } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { colors, fonts } from '../theme';
+import { fonts, useTheme } from '../theme';
 import type { ChartWindow } from '../lib/derive';
 import { describeWeather } from '../lib/wmo';
 import { WeatherIcon } from './WeatherIcon';
@@ -52,7 +52,9 @@ function smooth(pts: Pt[]): string {
   return s;
 }
 
-export function WxChart({ type, window: win, accent = colors.coral }: Props) {
+export function WxChart({ type, window: win, accent: accentProp }: Props) {
+  const { colors } = useTheme();
+  const accent = accentProp ?? colors.coral;
   const [width, setWidth] = useState(0);
   const [frac, setFrac] = useState<number | null>(null);
 
@@ -221,7 +223,7 @@ export function WxChart({ type, window: win, accent = colors.coral }: Props) {
 
   // scrubber
   els.push(<Line key="scl" x1={sx} y1={PT - 8} x2={sx} y2={PB} stroke={accent} strokeWidth={1.5} />);
-  els.push(<Circle key="scd" cx={sx} cy={sy} r={4.5} fill="#fff" stroke={accent} strokeWidth={2.5} />);
+  els.push(<Circle key="scd" cx={sx} cy={sy} r={4.5} fill={colors.scrubDot} stroke={accent} strokeWidth={2.5} />);
 
   // readout bubble
   const bw = sub ? 78 : 54;

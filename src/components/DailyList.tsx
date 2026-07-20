@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { colors, fonts } from '../theme';
+import { fonts, useTheme, type Colors } from '../theme';
 import type { Forecast } from '../lib/openMeteo';
 import { describeWeather } from '../lib/wmo';
 import { degToCompass, dayLabel } from '../lib/format';
@@ -30,6 +30,8 @@ type Props = {
 };
 
 export function DailyList({ forecast }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const daily = forecast.daily;
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [tabs, setTabs] = useState<Record<number, DayTab>>({});
@@ -86,7 +88,13 @@ export function DailyList({ forecast }: Props) {
 
               <View style={[styles.colBar, styles.rangeRow]}>
                 <Text style={styles.lo}>{Math.round(daily.tempMin[i])}°</Text>
-                <RangeBar lo={daily.tempMin[i]} hi={daily.tempMax[i]} min={weekMin} max={weekMax} />
+                <RangeBar
+                  lo={daily.tempMin[i]}
+                  hi={daily.tempMax[i]}
+                  min={weekMin}
+                  max={weekMax}
+                  colors={colors}
+                />
                 <Text style={styles.hi}>{Math.round(daily.tempMax[i])}°</Text>
               </View>
 
@@ -121,65 +129,86 @@ export function DailyList({ forecast }: Props) {
   );
 }
 
-function RangeBar({ lo, hi, min, max }: { lo: number; hi: number; min: number; max: number }) {
+function RangeBar({
+  lo,
+  hi,
+  min,
+  max,
+  colors,
+}: {
+  lo: number;
+  hi: number;
+  min: number;
+  max: number;
+  colors: Colors;
+}) {
   const span = Math.max(1, max - min);
   const left = ((lo - min) / span) * 100;
   const width = Math.max(6, ((hi - lo) / span) * 100);
   return (
-    <View style={styles.track}>
-      <View style={[styles.fill, { left: `${left}%`, width: `${width}%` }]} />
+    <View style={{ flex: 1, height: 7, borderRadius: 4, backgroundColor: colors.segment, overflow: 'hidden' }}>
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          left: `${left}%`,
+          width: `${width}%`,
+          borderRadius: 4,
+          backgroundColor: colors.coral,
+        }}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  title: { fontFamily: fonts.serif, fontSize: 23, color: colors.ink, marginBottom: 8 },
+const makeStyles = (colors: Colors) =>
+  StyleSheet.create({
+    title: { fontFamily: fonts.serif, fontSize: 23, color: colors.ink, marginBottom: 8 },
 
-  head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 2, paddingBottom: 4 },
-  headCell: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 0.4, color: colors.faint },
+    head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 2, paddingBottom: 4 },
+    headCell: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 0.4, color: colors.faint },
 
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 2,
-    borderTopWidth: 1.5,
-    borderTopColor: colors.hairline,
-  },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 9,
+      paddingHorizontal: 2,
+      borderTopWidth: 1.5,
+      borderTopColor: colors.hairline,
+    },
 
-  colDay: { width: 78, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  colPrecip: { width: 50 },
-  colBar: { flex: 1 },
-  colWind: { width: 74 },
-  colChevron: { width: 14, textAlign: 'center', fontSize: 18, color: colors.coral },
-  chevronOpen: { transform: [{ rotate: '90deg' }] },
+    colDay: { width: 78, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    colPrecip: { width: 50 },
+    colBar: { flex: 1 },
+    colWind: { width: 74 },
+    colChevron: { width: 14, textAlign: 'center', fontSize: 18, color: colors.coral },
+    chevronOpen: { transform: [{ rotate: '90deg' }] },
 
-  center: { textAlign: 'center' },
+    center: { textAlign: 'center' },
 
-  day: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink },
+    day: { fontFamily: fonts.bodyBold, fontSize: 15, color: colors.ink },
 
-  precip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  precipText: { fontFamily: fonts.body, fontSize: 13, color: colors.blue },
+    precip: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    precipText: { fontFamily: fonts.body, fontSize: 13, color: colors.blue },
 
-  rangeRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  lo: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, width: 22, textAlign: 'right' },
-  hi: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink, width: 22 },
-  track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: colors.segment, overflow: 'hidden' },
-  fill: { position: 'absolute', top: 0, bottom: 0, borderRadius: 4, backgroundColor: colors.coral },
+    rangeRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    lo: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, width: 22, textAlign: 'right' },
+    hi: { fontFamily: fonts.bodyBold, fontSize: 13, color: colors.ink, width: 22 },
 
-  wind: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  windText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
+    wind: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    windText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
 
-  expand: {
-    borderWidth: 2,
-    borderColor: colors.coral,
-    borderRadius: 18,
-    backgroundColor: colors.wash,
-    padding: 12,
-    marginTop: 4,
-    marginBottom: 6,
-    gap: 8,
-  },
-  expandHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  expandDay: { fontFamily: fonts.serif, fontSize: 16, color: colors.ink },
-});
+    expand: {
+      borderWidth: 2,
+      borderColor: colors.coral,
+      borderRadius: 18,
+      backgroundColor: colors.wash,
+      padding: 12,
+      marginTop: 4,
+      marginBottom: 6,
+      gap: 8,
+    },
+    expandHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    expandDay: { fontFamily: fonts.serif, fontSize: 16, color: colors.ink },
+  });
