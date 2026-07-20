@@ -25,10 +25,12 @@ export async function getCurrentPlace(): Promise<LocationResult> {
       const results = await Location.reverseGeocodeAsync({ latitude, longitude });
       const g = results[0];
       if (g) {
+        // Prefer the locality/city. `name` is often a street or house number
+        // (e.g. "56") rather than a place name, so it's only a last resort.
         name =
-          [g.name, g.street, g.city, g.subregion].find((v) => !!v) ??
+          [g.city, g.district, g.subregion, g.region, g.name].find((v) => !!v) ??
           'Current Location';
-        admin1 = g.region ?? undefined;
+        admin1 = g.region && g.region !== name ? g.region : undefined;
         country = g.country ?? undefined;
       }
     } catch {
