@@ -17,6 +17,7 @@ import { WeatherIcon } from './WeatherIcon';
 import { DropGlyph, WindArrow } from './icons';
 import { SegmentedTabs } from './SegmentedTabs';
 import { WxChart } from './WxChart';
+import { LegendMenu } from './LegendMenu';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -35,6 +36,9 @@ export function DailyList({ forecast }: Props) {
   const daily = forecast.daily;
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [tabs, setTabs] = useState<Record<number, DayTab>>({});
+  const [hiddenByDay, setHiddenByDay] = useState<Record<number, Record<string, boolean>>>({});
+  const toggleDay = (i: number, id: string) =>
+    setHiddenByDay((prev) => ({ ...prev, [i]: { ...(prev[i] || {}), [id]: !prev[i]?.[id] } }));
 
   const weekMin = Math.min(...daily.tempMin);
   const weekMax = Math.max(...daily.tempMax);
@@ -112,14 +116,22 @@ export function DailyList({ forecast }: Props) {
               <View style={styles.expand}>
                 <View style={styles.expandHead}>
                   <Text style={styles.expandDay}>{dayLabel(iso, todayIso)}</Text>
-                  <SegmentedTabs
-                    options={DAY_TABS}
-                    value={tab}
-                    onChange={(t) => setDayTab(i, t)}
-                    size="sm"
-                  />
+                  <View style={styles.expandControls}>
+                    <LegendMenu
+                      type={tab}
+                      hidden={hiddenByDay[i] ?? {}}
+                      onToggle={(id) => toggleDay(i, id)}
+                      size="sm"
+                    />
+                    <SegmentedTabs
+                      options={DAY_TABS}
+                      value={tab}
+                      onChange={(t) => setDayTab(i, t)}
+                      size="sm"
+                    />
+                  </View>
                 </View>
-                <WxChart type={tab} window={dayWindow(forecast, i)} />
+                <WxChart type={tab} window={dayWindow(forecast, i)} hidden={hiddenByDay[i] ?? {}} />
               </View>
             )}
           </View>
@@ -166,12 +178,13 @@ const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     title: { fontFamily: fonts.serif, fontSize: 23, color: colors.ink, marginBottom: 8 },
 
-    head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 2, paddingBottom: 4 },
+    head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 2, paddingBottom: 4 },
     headCell: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 0.4, color: colors.faint },
 
     row: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 10,
       paddingVertical: 9,
       paddingHorizontal: 2,
       borderTopWidth: 1.5,
@@ -182,7 +195,7 @@ const makeStyles = (colors: Colors) =>
     colPrecip: { width: 50 },
     colBar: { flex: 1 },
     colWind: { width: 74 },
-    colChevron: { width: 14, textAlign: 'center', fontSize: 18, color: colors.coral },
+    colChevron: { width: 14, marginLeft: -6, textAlign: 'center', fontSize: 18, color: colors.coral },
     chevronOpen: { transform: [{ rotate: '90deg' }] },
 
     center: { textAlign: 'center' },
@@ -210,5 +223,6 @@ const makeStyles = (colors: Colors) =>
       gap: 8,
     },
     expandHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    expandControls: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     expandDay: { fontFamily: fonts.serif, fontSize: 16, color: colors.ink },
   });

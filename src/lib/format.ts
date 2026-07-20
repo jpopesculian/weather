@@ -40,20 +40,18 @@ export function shortClock(iso: string): string {
 
 // Fraction (0..1) of a 24h window that starts at `startHour` → clock string.
 export function fracToClock(frac: number, startHour: number): string {
-  let hh = (startHour + frac * 24) % 24;
-  const ap = hh < 12 ? 'AM' : 'PM';
-  let hr = Math.floor(hh) % 12;
-  if (hr === 0) hr = 12;
-  const min = Math.round((hh - Math.floor(hh)) * 60);
-  const mm = min === 60 ? '00' : String(min).padStart(2, '0');
-  return `${hr}:${mm} ${ap}`;
+  const total = (startHour + frac * 24) % 24;
+  let h = Math.floor(total);
+  let min = Math.round((total - h) * 60);
+  if (min === 60) {
+    min = 0;
+    h = (h + 1) % 24;
+  }
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 }
 
-// Compact x-axis tick like "12P", "6A".
+// Compact 24-hour x-axis tick like "12", "18", "00", "06".
 export function hourTick(iso: string): string {
   const h = parseInt(iso.slice(11, 13), 10);
-  const ap = h < 12 ? 'A' : 'P';
-  let hr = h % 12;
-  if (hr === 0) hr = 12;
-  return `${hr}${ap}`;
+  return String(h).padStart(2, '0');
 }

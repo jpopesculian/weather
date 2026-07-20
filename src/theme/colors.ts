@@ -5,7 +5,7 @@
 
 export const colorsLight = {
   // Surfaces
-  cream: '#f0eee9', // app background
+  cream: '#f8f3e9', // app background (warm cream)
   card: '#fffdf8', // raised cards / sheets
   segment: '#f2efe7', // segmented-control track
   wash: '#fffaf4', // expanded-day card wash

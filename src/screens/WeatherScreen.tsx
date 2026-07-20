@@ -26,6 +26,7 @@ import { Header } from '../components/Header';
 import { RightNow } from '../components/RightNow';
 import { SegmentedTabs } from '../components/SegmentedTabs';
 import { WxChart } from '../components/WxChart';
+import { LegendMenu } from '../components/LegendMenu';
 import { DailyList } from '../components/DailyList';
 import { SearchModal } from '../components/SearchModal';
 
@@ -48,6 +49,7 @@ export function WeatherScreen() {
   const twoCol = width >= TWO_COL_BREAKPOINT;
   const [place, setPlace] = useState<Place | null>(null);
   const [todayTab, setTodayTab] = useState<TodayTab>('Temp');
+  const [todayHidden, setTodayHidden] = useState<Record<string, boolean>>({});
   const [searchVisible, setSearchVisible] = useState(false);
   const [locating, setLocating] = useState(false);
   const { forecast, loading, error, refresh } = useForecast(place);
@@ -148,10 +150,17 @@ export function WeatherScreen() {
               <View style={styles.section}>
                 <View style={styles.todayHead}>
                   <Text style={styles.todayTitle}>Today</Text>
-                  <SegmentedTabs options={TODAY_TABS} value={todayTab} onChange={setTodayTab} />
+                  <View style={styles.todayControls}>
+                    <LegendMenu
+                      type={todayTab}
+                      hidden={todayHidden}
+                      onToggle={(id) => setTodayHidden((h) => ({ ...h, [id]: !h[id] }))}
+                    />
+                    <SegmentedTabs options={TODAY_TABS} value={todayTab} onChange={setTodayTab} />
+                  </View>
                 </View>
                 <View style={styles.chartCard}>
-                  <WxChart type={todayTab} window={todayWindow(forecast)} />
+                  <WxChart type={todayTab} window={todayWindow(forecast)} hidden={todayHidden} />
                 </View>
                 <Text style={styles.hint}>drag the scrubber to read values</Text>
               </View>
@@ -193,6 +202,7 @@ const makeStyles = (colors: Colors) =>
 
   section: { gap: 12 },
   todayHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  todayControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   todayTitle: { fontFamily: fonts.serif, fontSize: 23, color: colors.ink },
 
   chartCard: {

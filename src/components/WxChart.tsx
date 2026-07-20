@@ -3,21 +3,49 @@
 // (speed + gust + direction arrows), all with a draggable scrubber + readout.
 import { useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Line, Path, Rect, Circle, G, Text as SvgText } from 'react-native-svg';
+import Svg, { Line, Path, Rect, Circle, G, Text as SvgText, TSpan } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { fonts, useTheme } from '../theme';
+import { fonts, useTheme, type Colors } from '../theme';
 import type { ChartWindow } from '../lib/derive';
 import { describeWeather } from '../lib/wmo';
 import { WeatherIcon } from './WeatherIcon';
 import { fracToClock, hourTick } from '../lib/format';
 
-type ChartType = 'Temp' | 'Precip' | 'Wind';
+export type ChartType = 'Temp' | 'Precip' | 'Wind';
+
+export type LegendSeries = { id: string; label: string; color: string; dashed: boolean };
+
+// Shared dash pattern for all dotted overlay lines (cloud, humidity, gust) and
+// their legend swatches — keeps the dash style uniform across graphs.
+export const OVERLAY_DASH = '1 5';
+
+// Series shown in the legend for each chart type (Precip has a single series).
+export function legendSeriesFor(type: ChartType, colors: Colors): LegendSeries[] {
+  if (type === 'Temp')
+    return [
+      { id: 'temp', label: 'Temperature', color: colors.ink, dashed: false },
+      { id: 'cloud', label: 'Cloud cover', color: colors.cloudLine, dashed: true },
+      { id: 'humidity', label: 'Humidity', color: colors.blue, dashed: true },
+    ];
+  if (type === 'Wind')
+    return [
+      { id: 'speed', label: 'Wind speed', color: colors.ink, dashed: false },
+      { id: 'gust', label: 'Gusts', color: colors.gust, dashed: true },
+    ];
+  if (type === 'Precip')
+    return [
+      { id: 'rain', label: 'Rainfall', color: colors.blue, dashed: false },
+      { id: 'chance', label: 'Chance', color: colors.ink, dashed: true },
+    ];
+  return [];
+}
 
 type Props = {
   type: ChartType;
   window: ChartWindow;
   accent?: string;
+  hidden?: Record<string, boolean>;
 };
 
 // viewBox geometry (matches the design).
@@ -32,6 +60,12 @@ const PH = PB - PT;
 const ICON_Y = PB + 30;
 const LABEL_Y = PB + 15;
 const ICON_PX = 22; // overlay icon pixel size
+const CARET_W = 10; // readout arrowhead base width (also the scrubber shaft width)
+
+// Fixed 0–100% vertical mapping — precip, cloud, and humidity always use this
+// (so a given % sits at the same height regardless of the data). Temperature
+// and wind use their own auto-scaled (relative) mappings.
+const yPercent = (v: number) => PB - (Math.max(0, Math.min(100, v)) / 100) * PH;
 
 type Pt = [number, number];
 
@@ -52,13 +86,16 @@ function smooth(pts: Pt[]): string {
   return s;
 }
 
-export function WxChart({ type, window: win, accent: accentProp }: Props) {
+export function WxChart({ type, window: win, accent: accentProp, hidden = {} }: Props) {
   const { colors } = useTheme();
   const accent = accentProp ?? colors.coral;
   const [width, setWidth] = useState(0);
   const [frac, setFrac] = useState<number | null>(null);
 
   const N = win.times.length;
+  // Data is hourly; thin the on-chart markers (labels/icons/arrows) to ~8–9
+  // evenly spaced points so they stay readable regardless of point count.
+  const markerEvery = Math.max(1, Math.round((N - 1) / 8));
   const scale = width > 0 ? width / VBW : 0;
   const height = width * (VBH / VBW);
 
@@ -99,9 +136,9 @@ export function WxChart({ type, window: win, accent: accentProp }: Props) {
     const gy = PT + g * (PH / 2);
     els.push(<Line key={`g${g}`} x1={PL} y1={gy} x2={PR} y2={gy} stroke={colors.grid} strokeWidth={1} />);
   }
-  // x labels (every other point)
+  // x labels (thinned to marker cadence)
   win.times.forEach((iso, i) => {
-    if (i % 2 === 0) {
+    if (i % markerEvery === 0) {
       els.push(
         <SvgText key={`xl${i}`} x={xAt(i)} y={LABEL_Y} fontSize={10} fontFamily={fonts.body} fill={colors.faint} textAnchor="middle">
           {hourTick(iso)}
@@ -110,14 +147,35 @@ export function WxChart({ type, window: win, accent: accentProp }: Props) {
     }
   });
 
+  // y-axis unit labels: left axis, and (temp/precip only) the right 0–100% axis.
+  const leftUnit = type === 'Temp' ? '°C' : type === 'Precip' ? 'mm' : 'km/h';
+  els.push(
+    <SvgText key="uL" x={PL} y={PT - 5} fontSize={9} fontFamily={fonts.body} fill={colors.faint} textAnchor="start">
+      {leftUnit}
+    </SvgText>
+  );
+  if (type !== 'Wind') {
+    els.push(
+      <SvgText key="uR" x={PR} y={PT - 5} fontSize={9} fontFamily={fonts.body} fill={colors.faint} textAnchor="end">
+        %
+      </SvgText>
+    );
+  }
+
   let sx = PL;
   let sy = PB;
-  let readout = '';
-  let sub = '';
+  let readout = ''; // line-1 text for temp/precip (and wind fallback)
+  let mainVal: number | null = null; // wind: speed (drives the "x/y km/h" line)
+  let subVal: number | null = null; // wind: gust (shown only when the gust series is on)
+  let line2Suffix = ''; // precip: appends " · N%" (chance) to the time line
+  let primaryVisible = true; // is the scrubbed (primary) series shown?
+  let leftBottom = 0; // left-axis value at the bottom gridline
+  let leftTop = 1; // left-axis value at the top gridline
 
   const pushConditionIcons = () => {
     if (scale <= 0) return;
     win.codes.forEach((code, i) => {
+      if (i % markerEvery !== 0) return;
       const cond = describeWeather(code, win.isDay[i] === 1);
       overlay.push(
         <View
@@ -142,10 +200,12 @@ export function WxChart({ type, window: win, accent: accentProp }: Props) {
     const clouds = win.cloud;
     const vmin = Math.min(...temps) - 3;
     const vmax = Math.max(...temps) + 3;
-    const yT = (v: number) => PB - ((v - vmin) / (vmax - vmin)) * PH;
-    const yC = (v: number) => PB - (v / 100) * PH * 0.92;
+    leftBottom = vmin;
+    leftTop = vmax;
+    const yT = (v: number) => PB - ((v - vmin) / (vmax - vmin)) * PH; // relative
     const pts: Pt[] = temps.map((v, i) => [xAt(i), yT(v)]);
-    const cpts: Pt[] = clouds.map((v, i) => [xAt(i), yC(v)]);
+    const cpts: Pt[] = clouds.map((v, i) => [xAt(i), yPercent(v)]);
+    const hpts: Pt[] = win.humidity.map((v, i) => [xAt(i), yPercent(v)]);
 
     // sunrise / sunset markers
     ([['sunsetFrac', 'Sunset'], ['sunriseFrac', 'Sunrise']] as const).forEach(([k, lab], idx) => {
@@ -160,10 +220,15 @@ export function WxChart({ type, window: win, accent: accentProp }: Props) {
       );
     });
 
-    // area fill + cloud line + temp line
-    els.push(<Path key="area" d={`${smooth(pts)} L${PR},${PB} L${PL},${PB} Z`} fill={accent} opacity={0.08} />);
-    els.push(<Path key="cloud" d={smooth(cpts)} fill="none" stroke={colors.cloudLine} strokeWidth={1.6} strokeDasharray="1 5" strokeLinecap="round" />);
-    els.push(<Path key="line" d={smooth(pts)} fill="none" stroke={colors.ink} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />);
+    // area fill + cloud + humidity + temp line (each togglable via the legend)
+    const tempVisible = !hidden.temp;
+    const cloudVisible = !hidden.cloud;
+    const humidityVisible = !hidden.humidity;
+    primaryVisible = tempVisible;
+    if (tempVisible) els.push(<Path key="area" d={`${smooth(pts)} L${PR},${PB} L${PL},${PB} Z`} fill={accent} opacity={0.08} />);
+    if (cloudVisible) els.push(<Path key="cloud" d={smooth(cpts)} fill="none" stroke={colors.cloudLine} strokeWidth={1.6} strokeDasharray={OVERLAY_DASH} strokeLinecap="round" />);
+    if (humidityVisible) els.push(<Path key="humidity" d={smooth(hpts)} fill="none" stroke={colors.blue} strokeWidth={1.6} strokeDasharray={OVERLAY_DASH} strokeLinecap="round" />);
+    if (tempVisible) els.push(<Path key="line" d={smooth(pts)} fill="none" stroke={colors.ink} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />);
 
     // now dot
     if (win.nowFrac != null) {
@@ -176,37 +241,58 @@ export function WxChart({ type, window: win, accent: accentProp }: Props) {
     sy = yT(sv);
     readout = `${Math.round(sv)}°`;
   } else if (type === 'Precip') {
-    const precip = win.precipProb;
-    const pmax = Math.max(10, ...precip);
-    const yP = (v: number) => PB - (v / pmax) * PH * 0.92;
+    const mm = win.precip; // rainfall amount (mm) → histogram bars
+    const prob = win.precipProb; // chance of rain (%) → line, fixed 0–100
+    const rainVisible = !hidden.rain;
+    const chanceVisible = !hidden.chance;
+    primaryVisible = rainVisible || chanceVisible;
+    const mmMax = Math.max(2, ...mm); // auto-scale bars (floor so a trace isn't exaggerated)
+    leftBottom = 0;
+    leftTop = mmMax;
+    const yMm = (v: number) => PB - (v / mmMax) * PH;
     const ni = Math.round(curFrac * (N - 1));
-    precip.forEach((v, i) => {
-      const bw = (PW / N) * 0.52;
-      const bx = xAt(i) - bw / 2;
-      const by = yP(v);
-      els.push(<Rect key={`b${i}`} x={bx} y={by} width={bw} height={Math.max(1.5, PB - by)} rx={3} fill={i === ni ? colors.precipActive : colors.precip} />);
-    });
+
+    if (rainVisible) {
+      mm.forEach((v, i) => {
+        const bw = (PW / N) * 0.52;
+        const bx = xAt(i) - bw / 2;
+        const by = yMm(v);
+        els.push(<Rect key={`b${i}`} x={bx} y={by} width={bw} height={Math.max(1.5, PB - by)} rx={3} fill={i === ni ? colors.precipActive : colors.precip} />);
+      });
+    }
+    if (chanceVisible) {
+      const cpts: Pt[] = prob.map((v, i) => [xAt(i), yPercent(v)]);
+      els.push(<Path key="chance" d={smooth(cpts)} fill="none" stroke={colors.ink} strokeWidth={2} strokeDasharray={OVERLAY_DASH} strokeLinecap="round" />);
+    }
     pushConditionIcons();
+
     sx = xAt(ni);
-    sy = yP(precip[ni]);
-    readout = `${Math.round(precip[ni])}%`;
+    if (rainVisible) {
+      sy = yMm(mm[ni]);
+      readout = `${mm[ni].toFixed(1)} mm`;
+      line2Suffix = chanceVisible ? ` · ${Math.round(prob[ni])}%` : '';
+    } else {
+      sy = yPercent(prob[ni]);
+      readout = `${Math.round(prob[ni])}%`;
+    }
   } else {
     const wind = win.wind;
     const gust = win.gust;
     const dir = win.dir;
     const wmax = Math.max(...gust) + 4;
-    const yW = (v: number) => PB - (v / wmax) * PH * 0.94;
+    leftBottom = 0;
+    leftTop = wmax;
+    const yW = (v: number) => PB - (v / wmax) * PH;
     const wpts: Pt[] = wind.map((v, i) => [xAt(i), yW(v)]);
     const gpts: Pt[] = gust.map((v, i) => [xAt(i), yW(v)]);
-    els.push(<Path key="gust" d={smooth(gpts)} fill="none" stroke={colors.gust} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" />);
-    els.push(<Path key="spd" d={smooth(wpts)} fill="none" stroke={colors.ink} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />);
-    // legend
-    els.push(<Line key="lg1" x1={PL} y1={PT - 24} x2={PL + 14} y2={PT - 24} stroke={colors.ink} strokeWidth={2.5} />);
-    els.push(<SvgText key="lg1t" x={PL + 18} y={PT - 21} fontSize={9} fontFamily={fonts.body} fill={colors.muted}>speed</SvgText>);
-    els.push(<Line key="lg2" x1={PL + 58} y1={PT - 24} x2={PL + 72} y2={PT - 24} stroke={colors.gust} strokeWidth={2} strokeDasharray="4 3" />);
-    els.push(<SvgText key="lg2t" x={PL + 76} y={PT - 21} fontSize={9} fontFamily={fonts.body} fill={colors.muted}>gust</SvgText>);
-    // direction arrows (drawn inside svg)
+    const speedVisible = !hidden.speed;
+    const gustVisible = !hidden.gust;
+    primaryVisible = speedVisible;
+    if (gustVisible) els.push(<Path key="gust" d={smooth(gpts)} fill="none" stroke={colors.gust} strokeWidth={2} strokeDasharray={OVERLAY_DASH} strokeLinecap="round" />);
+    if (speedVisible) els.push(<Path key="spd" d={smooth(wpts)} fill="none" stroke={colors.ink} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />);
+    // direction arrows (drawn inside svg, thinned to marker cadence)
     win.times.forEach((_, i) => {
+      if (i % markerEvery !== 0) return;
       els.push(
         <G key={`da${i}`} transform={`translate(${xAt(i)}, ${ICON_Y}) rotate(${dir[i] + 180})`}>
           <Path d="M0 -5 L0 5 M-2.6 -2 L0 -5 L2.6 -2" fill="none" stroke={colors.soft} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
@@ -218,33 +304,88 @@ export function WxChart({ type, window: win, accent: accentProp }: Props) {
     sx = PL + curFrac * PW;
     sy = yW(sv);
     readout = `${Math.round(sv)} km/h`;
-    sub = `gusts ${Math.round(sg)}`;
+    mainVal = Math.round(sv);
+    subVal = gustVisible ? Math.round(sg) : null;
   }
 
-  // scrubber
-  els.push(<Line key="scl" x1={sx} y1={PT - 8} x2={sx} y2={PB} stroke={accent} strokeWidth={1.5} />);
-  els.push(<Circle key="scd" cx={sx} cy={sy} r={4.5} fill={colors.scrubDot} stroke={accent} strokeWidth={2.5} />);
-
-  // readout bubble
-  const bw = sub ? 78 : 54;
-  const bh = sub ? 32 : 26;
-  const bx = Math.max(PL, Math.min(PR - bw, sx - bw / 2));
-  els.push(
-    <G key="ro">
-      <Rect x={bx} y={6} width={bw} height={bh} rx={8} fill={colors.card} stroke={accent} strokeWidth={1.5} />
-      <SvgText x={bx + bw / 2} y={sub ? 19 : 20} fontSize={15} fontFamily={fonts.bodyExtra} fill={colors.ink} textAnchor="middle">
-        {readout}
+  // y-axis tick values at the bottom / middle / top gridlines.
+  const fmtL = (v: number) => (type === 'Precip' ? String(Number(v.toFixed(1))) : String(Math.round(v)));
+  const leftMid = (leftBottom + leftTop) / 2;
+  const leftTicks: Array<[number, number]> = [
+    [PT, leftTop],
+    [PT + PH / 2, leftMid],
+    [PB, leftBottom],
+  ];
+  leftTicks.forEach(([gy, v], i) => {
+    els.push(
+      <SvgText key={`lt${i}`} x={PL - 3} y={gy + 3} fontSize={8} fontFamily={fonts.body} fill={colors.faint} textAnchor="end">
+        {fmtL(v)}
       </SvgText>
-      {sub ? (
-        <SvgText x={bx + bw / 2} y={28} fontSize={8.5} fontFamily={fonts.body} fill={colors.soft} textAnchor="middle">
-          {sub}
+    );
+  });
+  if (type !== 'Wind') {
+    const rightTicks: Array<[number, number]> = [
+      [PT, 100],
+      [PT + PH / 2, 50],
+      [PB, 0],
+    ];
+    rightTicks.forEach(([gy, v], i) => {
+      els.push(
+        <SvgText key={`rt${i}`} x={PR + 3} y={gy + 3} fontSize={8} fontFamily={fonts.body} fill={colors.faint} textAnchor="start">
+          {v}
         </SvgText>
-      ) : null}
-      <SvgText x={bx + bw / 2} y={bh + 18} fontSize={9} fontFamily={fonts.body} fill={accent} textAnchor="middle">
-        {fracToClock(curFrac, win.startHour)}
-      </SvgText>
-    </G>
-  );
+      );
+    });
+  }
+
+  // Thin scrubber position line (kept thin, full height).
+  els.push(<Line key="scl" x1={sx} y1={PT - 8} x2={sx} y2={PB} stroke={accent} strokeWidth={1.5} />);
+
+  // Floating tag readout (design 1b/1c): a filled callout that rides the dot,
+  // flipping above/below to stay on-screen. Value + time in one tight unit
+  // (wind folds gust into "speed/gust km/h").
+  if (primaryVisible) {
+    const timeStr = fracToClock(curFrac, win.startHour);
+    const l1len = subVal != null ? String(mainVal).length + String(subVal).length + 6 : readout.length;
+    const l2len = (timeStr + line2Suffix).length;
+    const tw = Math.max(50, Math.max(l1len * 8.2, l2len * 5.0) + 14);
+    const th = 30;
+    const cw = CARET_W / 2;
+    // Let the tag overhang the plot edge by half the caret width, so when it
+    // clamps the caret/filler tuck under it and the tag's top corners stay clean.
+    const tx = Math.max(PL - cw, Math.min(PR - tw + cw, sx - tw / 2));
+    const above = sy - th - 12 > 2;
+    const ty = above ? sy - th - 12 : sy + 12;
+    const caret = above
+      ? `M${sx - cw},${ty + th} L${sx + cw},${ty + th} L${sx},${ty + th + 6} Z`
+      : `M${sx - cw},${ty} L${sx + cw},${ty} L${sx},${ty - 6} Z`;
+
+    els.push(<Circle key="scd" cx={sx} cy={sy} r={4.5} fill={colors.scrubDot} stroke={accent} strokeWidth={2.5} />);
+    els.push(
+      <G key="ro">
+        {/* Caret-width × half-readout-height filler on the caret side, behind the
+            tag — joins the arrowhead to the tag at the edges without reaching (and
+            squaring off) the tag's far corners. */}
+        <Rect x={sx - cw} y={above ? ty + th / 2 : ty} width={CARET_W} height={th / 2} fill={accent} />
+        <Path d={caret} fill={accent} />
+        <Rect x={tx} y={ty} width={tw} height={th} rx={9} fill={accent} />
+        {subVal != null ? (
+          <SvgText x={tx + tw / 2} y={ty + 14} textAnchor="middle">
+            <TSpan fontSize={14} fontFamily={fonts.bodyExtra} fill="#fff">{String(mainVal)}</TSpan>
+            <TSpan fontSize={10} fontFamily={fonts.bodyBold} fill="rgba(255,255,255,0.6)">{`/${subVal}`}</TSpan>
+            <TSpan fontSize={14} fontFamily={fonts.bodyExtra} fill="#fff">{' km/h'}</TSpan>
+          </SvgText>
+        ) : (
+          <SvgText x={tx + tw / 2} y={ty + 14} textAnchor="middle" fontSize={14} fontFamily={fonts.bodyExtra} fill="#fff">
+            {readout}
+          </SvgText>
+        )}
+        <SvgText x={tx + tw / 2} y={ty + 24} textAnchor="middle" fontSize={8.5} fontFamily={fonts.bodySemi} fill="rgba(255,255,255,0.85)">
+          {`${timeStr}${line2Suffix}`}
+        </SvgText>
+      </G>
+    );
+  }
 
   return (
     <View style={styles.wrap} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
@@ -265,3 +406,4 @@ export function WxChart({ type, window: win, accent: accentProp }: Props) {
 const styles = StyleSheet.create({
   wrap: { width: '100%' },
 });
+

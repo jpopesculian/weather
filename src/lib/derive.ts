@@ -1,5 +1,6 @@
 // Derived views over a Forecast: locate "now", and build the 24h chart windows
-// (downsampled to ~9 points, matching the wireframe's axis density).
+// at hourly resolution (25 points). WxChart thins the on-chart markers so they
+// stay readable.
 import type { Forecast, HourlyWx } from './openMeteo';
 
 const MS_PER_HOUR = 3600_000;
@@ -27,7 +28,9 @@ export type ChartWindow = {
   times: string[]; // iso per sampled point
   temp: number[];
   cloud: number[];
-  precipProb: number[];
+  humidity: number[];
+  precip: number[]; // rainfall amount (mm)
+  precipProb: number[]; // chance of rain (%)
   wind: number[];
   gust: number[];
   dir: number[];
@@ -39,7 +42,7 @@ export type ChartWindow = {
   sunsetFrac: number | null;
 };
 
-const STEP = 3; // hours between sampled points
+const STEP = 1; // hours between sampled points (hourly)
 const SPAN = 24; // window length in hours
 
 function sample<T>(arr: T[], start: number, count: number): T[] {
@@ -59,7 +62,7 @@ function fracWithin(iso: string | undefined, startMs: number): number | null {
 
 function build(forecast: Forecast, startIdx: number, dayIdx: number, nowIso?: string): ChartWindow {
   const h = forecast.hourly;
-  const count = SPAN / STEP; // 8 → 9 points inclusive
+  const count = SPAN / STEP; // 24 → 25 points inclusive (hourly)
   const times = sample(h.time, startIdx, count);
   const startMs = localMs(h.time[startIdx]);
   const d = forecast.daily;
@@ -67,6 +70,8 @@ function build(forecast: Forecast, startIdx: number, dayIdx: number, nowIso?: st
     times,
     temp: sample(h.temp, startIdx, count),
     cloud: sample(h.cloud, startIdx, count),
+    humidity: sample(h.humidity, startIdx, count),
+    precip: sample(h.precip, startIdx, count),
     precipProb: sample(h.precipProb, startIdx, count),
     wind: sample(h.windSpeed, startIdx, count),
     gust: sample(h.windGust, startIdx, count),

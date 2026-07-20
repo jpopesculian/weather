@@ -30,6 +30,7 @@ export type HourlyWx = {
   precip: number[];
   precipProb: number[];
   cloud: number[];
+  humidity: number[];
   weatherCode: number[];
   isDay: number[];
   windSpeed: number[];
@@ -72,6 +73,7 @@ const HOURLY_FIELDS = [
   'precipitation',
   'precipitation_probability',
   'cloud_cover',
+  'relative_humidity_2m',
   'weather_code',
   'is_day',
   'wind_speed_10m',
@@ -124,6 +126,7 @@ export async function fetchForecast(lat: number, lon: number): Promise<Forecast>
       precip: j.hourly.precipitation,
       precipProb: j.hourly.precipitation_probability,
       cloud: j.hourly.cloud_cover,
+      humidity: j.hourly.relative_humidity_2m,
       weatherCode: j.hourly.weather_code,
       isDay: j.hourly.is_day,
       windSpeed: j.hourly.wind_speed_10m,
