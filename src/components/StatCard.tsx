@@ -22,8 +22,7 @@ const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     card: {
       flex: 1,
-      borderWidth: 2,
-      borderColor: colors.ink,
+      backgroundColor: colors.wash,
       borderRadius: 12,
       paddingVertical: 7,
       paddingHorizontal: 7,
