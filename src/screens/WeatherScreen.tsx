@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Above this width, lay out as two columns (weather + today | 10-day forecast).
 const TWO_COL_BREAKPOINT = 800;
-const MAX_CONTENT_WIDTH = 980;
 
 import { fonts, space, useTheme, type Colors } from '../theme';
 import { type Place } from '../lib/openMeteo';
@@ -220,7 +219,7 @@ const makeStyles = (colors: Colors) =>
   StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   content: { paddingHorizontal: space.screenH + 3, alignItems: 'center' },
-  inner: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, gap: 22 },
+  inner: { width: '100%', maxWidth: space.maxContent, gap: 22 },
 
   // Layout: single column (phone) vs two columns (desktop/tablet).
   stack: { gap: 22 },

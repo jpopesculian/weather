@@ -8,10 +8,20 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { fonts, useTheme, type Colors } from '../theme';
+import { fonts, space, useTheme, type Colors } from '../theme';
+
+// react-native-web renders TextInput as an <input>, which shows a browser focus
+// ring inside the search field; suppress it on web only.
+const webInputReset = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : null;
+
+// At/above this width, present a centered dialog instead of a bottom sheet.
+const DESKTOP_MIN_WIDTH = 800;
+const MODAL_MAX_WIDTH = 520;
 import {
   searchPlaces,
   fetchCurrentBrief,
@@ -42,6 +52,8 @@ export function SearchModal({
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= DESKTOP_MIN_WIDTH;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [briefs, setBriefs] = useState<Record<string, CurrentBrief>>({});
@@ -94,18 +106,22 @@ export function SearchModal({
   }, [query]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Pressable style={{ height: insets.top + 10 }} onPress={onClose} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
+    <Modal visible={visible} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View style={[styles.backdrop, isDesktop && styles.backdropCenter]}>
+        {isDesktop ? (
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        ) : (
+          <Pressable style={{ height: insets.top + 10 }} onPress={onClose} />
+        )}
+        <View style={isDesktop ? styles.card : styles.sheet}>
+          {!isDesktop && <View style={styles.handle} />}
 
           <View style={styles.searchRow}>
             <View style={styles.field}>
               <SearchGlyph size={18} color={colors.coral} />
               <TextInput
                 ref={inputRef}
-                style={styles.input}
+                style={[styles.input, webInputReset]}
                 value={query}
                 onChangeText={setQuery}
                 placeholder="Search city"
@@ -138,7 +154,8 @@ export function SearchModal({
 
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+            style={isDesktop && styles.resultsDesktop}
+            contentContainerStyle={{ paddingBottom: isDesktop ? 12 : insets.bottom + 20 }}
           >
             {loading && results.length === 0 && (
               <View style={styles.loadingBox}>
@@ -189,8 +206,12 @@ function HighlightedName({ name, query, colors }: { name: string; query: string;
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: colors.backdrop },
+    backdropCenter: { alignItems: 'center', justifyContent: 'center', padding: 24 },
     sheet: {
       flex: 1,
+      width: '100%',
+      maxWidth: space.maxContent,
+      alignSelf: 'center',
       backgroundColor: colors.card,
       borderTopLeftRadius: 26,
       borderTopRightRadius: 26,
@@ -199,6 +220,20 @@ const makeStyles = (colors: Colors) =>
       paddingHorizontal: 16,
       paddingTop: 12,
     },
+    // Centered dialog on wide screens.
+    card: {
+      width: '100%',
+      maxWidth: MODAL_MAX_WIDTH,
+      maxHeight: '85%',
+      backgroundColor: colors.card,
+      borderRadius: 22,
+      borderWidth: 2.5,
+      borderColor: colors.ink,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      overflow: 'hidden',
+    },
+    resultsDesktop: { flexShrink: 1 },
     handle: { width: 42, height: 5, borderRadius: 3, backgroundColor: colors.handle, alignSelf: 'center', marginBottom: 16 },
 
     searchRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 6 },
