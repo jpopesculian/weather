@@ -22,7 +22,7 @@
       "package": "io.github.jpopesculian"
     },
     "web": {
-      "favicon": "./assets/adaptive-icon.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       [
