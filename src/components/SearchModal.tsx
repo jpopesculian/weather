@@ -215,8 +215,6 @@ const makeStyles = (colors: Colors) =>
       backgroundColor: colors.card,
       borderTopLeftRadius: 26,
       borderTopRightRadius: 26,
-      borderTopWidth: 2.5,
-      borderColor: colors.ink,
       paddingHorizontal: 16,
       paddingTop: 12,
     },
